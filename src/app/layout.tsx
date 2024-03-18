@@ -1,3 +1,4 @@
+import { SocketProvider } from "@/context/socket-context";
 import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import Footer from "./_components/footer";
@@ -27,7 +28,7 @@ export default function RootLayout({
       <body className={`${font.className} dark`}>
         <Header />
         <main className="flex-1 container mx-auto px-5 py-4 my-4 antialiased">
-          {children}
+          <SocketProvider>{children}</SocketProvider>
         </main>
         <Footer />
       </body>

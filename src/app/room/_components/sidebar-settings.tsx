@@ -13,31 +13,55 @@ import {
 import { useState } from "react";
 import { twMerge } from "tailwind-merge";
 
-interface IRoomActions {
+interface IUserSidebarActions {
   microphone: boolean;
   camera: boolean;
   screen: boolean;
 }
 
-const RoomActionsDefault: IRoomActions = {
+interface SideBarSettingsProps {
+  videoMediaStream: MediaStream | null;
+}
+
+const userSidebarActionsDefault: IUserSidebarActions = {
   microphone: true,
   camera: true,
   screen: true,
 };
 
-const SideBarSettings = () => {
-  const [roomActions, setRoomActions] = useState<IRoomActions>(
-    RoomActionsDefault as IRoomActions
-  );
+const SideBarSettings = ({ videoMediaStream }: SideBarSettingsProps) => {
+  const [userSidebarActions, setUserSidebarActions] =
+    useState<IUserSidebarActions>(
+      userSidebarActionsDefault as IUserSidebarActions
+    );
 
-  const handleToogleAction = (action: keyof IRoomActions, state: boolean) => {
-    setRoomActions((prev) => {
+  function handleToogleAction(
+    action: keyof IUserSidebarActions,
+    state: boolean
+  ) {
+    setUserSidebarActions((prev) => {
       return {
         ...prev,
         [action]: !state,
       };
     });
-  };
+  }
+
+  function toggleMicrophone() {
+    videoMediaStream
+      ?.getAudioTracks()
+      .forEach((track) => (track.enabled = userSidebarActions.microphone));
+
+    handleToogleAction("microphone", userSidebarActions.microphone);
+  }
+
+  function toggleCamera() {
+    videoMediaStream
+      ?.getVideoTracks()
+      .forEach((track) => (track.enabled = userSidebarActions.camera));
+
+    handleToogleAction("camera", userSidebarActions.camera);
+  }
 
   return (
     <div className="w-full bg-slate-900 py-2 px-5 rounded-md">
@@ -47,47 +71,49 @@ const SideBarSettings = () => {
             name="microphone"
             size="icon"
             variant="outline"
-            onClick={() =>
-              handleToogleAction("microphone", roomActions.microphone)
-            }
+            onClick={toggleMicrophone}
             className={twMerge(
-              !roomActions.microphone &&
+              !userSidebarActions.microphone &&
                 "border-red-400 text-red-400 hover:text-red-400",
               "bg-secondary"
             )}
           >
-            {roomActions.microphone && <Mic className="size-6" />}
-            {!roomActions.microphone && <MicOff className="size-6" />}
+            {userSidebarActions.microphone && <Mic className="size-6" />}
+            {!userSidebarActions.microphone && <MicOff className="size-6" />}
           </Button>
 
           <Button
             name="camera"
             size="icon"
             variant="outline"
-            onClick={() => handleToogleAction("camera", roomActions.camera)}
+            onClick={toggleCamera}
             className={twMerge(
-              !roomActions.camera &&
+              !userSidebarActions.camera &&
                 "border-red-400 text-red-400 hover:text-red-400",
               "bg-secondary"
             )}
           >
-            {roomActions.camera && <Camera className="size-6" />}
-            {!roomActions.camera && <CameraOff className="size-6" />}
+            {userSidebarActions.camera && <Camera className="size-6" />}
+            {!userSidebarActions.camera && <CameraOff className="size-6" />}
           </Button>
 
           <Button
             name="screen"
             size="icon"
             variant="outline"
-            onClick={() => handleToogleAction("screen", roomActions.screen)}
+            onClick={() =>
+              handleToogleAction("screen", userSidebarActions.screen)
+            }
             className={twMerge(
-              !roomActions.screen &&
+              !userSidebarActions.screen &&
                 "border-red-400 text-red-400 hover:text-red-400",
               "bg-secondary"
             )}
           >
-            {roomActions.screen && <ScreenShare className="size-6" />}
-            {!roomActions.screen && <ScreenShareOff className="size-6" />}
+            {userSidebarActions.screen && <ScreenShare className="size-6" />}
+            {!userSidebarActions.screen && (
+              <ScreenShareOff className="size-6" />
+            )}
           </Button>
 
           <Button
