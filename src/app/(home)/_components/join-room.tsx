@@ -16,7 +16,7 @@ import { FormEvent, useRef } from "react";
 const JoinRoom = () => {
   const userName = useRef<HTMLInputElement>(null);
   const roomId = useRef<HTMLInputElement>(null);
-  const roomKey = useRef<HTMLInputElement>(null);
+  // const roomKey = useRef<HTMLInputElement>(null);
 
   const handleJoinRoom = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -62,7 +62,7 @@ const JoinRoom = () => {
               autoFocus
             />
           </div>
-          <div className="space-y-1">
+          {/* <div className="space-y-1">
             <Label htmlFor="roomKey">
               Chave de entrada: (somente se a sala tiver senha)
             </Label>
@@ -72,7 +72,7 @@ const JoinRoom = () => {
               placeholder="xxxxx"
               ref={roomKey}
             />
-          </div>
+          </div> */}
         </CardContent>
         <CardFooter>
           <Button className="w-full uppercase" variant="default" type="submit">

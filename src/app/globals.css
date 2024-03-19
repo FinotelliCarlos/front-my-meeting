@@ -44,9 +44,3 @@
     @apply bg-background text-foreground flex flex-col h-screen;
   }
 }
-
-.mirror-mode {
-  -ms-transform: scaleX(-1);
-  -webkit-transform: scaleX(-1);
-  transform: scaleX(-1);
-}

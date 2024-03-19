@@ -1,11 +1,13 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import useSocket from "@/context/socket-context";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { twMerge } from "tailwind-merge";
 import Chat from "../_components/chat";
-import RoomLoading from "../_components/room-loading";
 import SideBarSettings from "../_components/sidebar-settings";
+import FrameVideo from "./_components/frame-video";
+import { handleUserMedia } from "./_helper/handle-video-media.helper";
 
 interface IAnswer {
   sender: string;
@@ -23,33 +25,23 @@ interface RoomParams {
   };
 }
 
-type RemoteStreamsProps = Array<{
-  media: MediaStream;
+export interface RemoteStreamsProps {
+  id: string;
+  media: MediaStream | null;
   userName: string;
-}>;
+}
 
 const Room = ({ params: { id } }: RoomParams) => {
   const { socket } = useSocket();
+  const router = useRouter();
 
   const currUserVideoStreaming = useRef<HTMLVideoElement>(null);
   const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
 
-  const [remoteStreams, setRemoreStreams] = useState<RemoteStreamsProps>([]);
+  const [remoteStreams, setRemoteStreams] = useState<RemoteStreamsProps[]>([]);
   const [videoMediaStream, setVideoMediaStream] = useState<MediaStream | null>(
     null
   );
-
-  async function handleUserMedia() {
-    const video = await navigator.mediaDevices.getUserMedia({
-      video: true,
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-      },
-    });
-
-    return video;
-  }
 
   async function handleUserLocalCamera() {
     const video = await handleUserMedia();
@@ -61,15 +53,10 @@ const Room = ({ params: { id } }: RoomParams) => {
     }
   }
 
-  async function initRemoteUserCamera() {
-    const video = await handleUserMedia();
-
-    return video;
-  }
-
   async function handleCreatePeerConnection(
     socketId: string,
-    createOffer: boolean
+    createOffer: boolean,
+    userName: string
   ) {
     const configConnection = {
       iceServers: [
@@ -86,13 +73,13 @@ const Room = ({ params: { id } }: RoomParams) => {
     const peerConnection = peerConnections.current[socketId];
 
     if (videoMediaStream) {
-      videoMediaStream.getTracks().forEach((track) => {
+      videoMediaStream?.getTracks().forEach((track) => {
         peerConnection.addTrack(track, videoMediaStream);
       });
     } else {
-      const video = await initRemoteUserCamera();
+      const video = await handleUserMedia();
 
-      video.getTracks().forEach((track) => {
+      video?.getTracks().forEach((track) => {
         peerConnection.addTrack(track, video);
       });
     }
@@ -112,14 +99,17 @@ const Room = ({ params: { id } }: RoomParams) => {
     peerConnection.ontrack = (event) => {
       const remoteStream = event.streams[0];
 
-      setRemoreStreams((prev) => {
-        return [
-          ...prev,
-          {
-            media: remoteStream,
-            userName: sessionStorage.getItem("userName") || "",
-          },
-        ];
+      const dataStream: RemoteStreamsProps = {
+        id: socketId,
+        media: remoteStream,
+        userName,
+      };
+
+      setRemoteStreams((prevRemote) => {
+        if (!prevRemote.some((stream) => stream.id === socketId)) {
+          return [...prevRemote, dataStream];
+        }
+        return prevRemote;
       });
     };
 
@@ -130,6 +120,35 @@ const Room = ({ params: { id } }: RoomParams) => {
           sender: socket.id,
           candidate: event.candidate,
         });
+      }
+    };
+
+    peerConnection.onsignalingstatechange = (_event) => {
+      switch (peerConnection.signalingState) {
+        case "closed":
+          setRemoteStreams((prevState) =>
+            prevState.filter((stream) => stream.id !== socketId)
+          );
+
+          break;
+      }
+    };
+
+    peerConnection.onconnectionstatechange = (_event) => {
+      switch (peerConnection.connectionState) {
+        case "disconnected":
+          setRemoteStreams((prevState) =>
+            prevState.filter((remote) => remote.id !== socketId)
+          );
+        case "failed":
+          setRemoteStreams((prevState) =>
+            prevState.filter((remote) => remote.id !== socketId)
+          );
+        case "closed":
+          setRemoteStreams((prevState) =>
+            prevState.filter((remote) => remote.id !== socketId)
+          );
+          break;
       }
     };
   }
@@ -164,11 +183,35 @@ const Room = ({ params: { id } }: RoomParams) => {
     }
   }
 
-  const loading = false;
+  function handleLogout() {
+    videoMediaStream?.getTracks().forEach((track) => {
+      track.stop();
+    });
+
+    Object.values(peerConnections.current).forEach((peerConnection) => {
+      peerConnection.close();
+    });
+
+    socket?.disconnect();
+
+    router.push("/");
+  }
+
+  const userName = useSyncExternalStore(
+    () => () => {
+      typeof window !== "undefined";
+    },
+    () => sessionStorage.getItem("userName"),
+    () => ""
+  );
 
   useEffect(() => {
     socket?.on("connect", async () => {
-      socket.emit("subscribe", { roomId: id, socketId: socket.id });
+      socket.emit("subscribe", {
+        roomId: id,
+        socketId: socket.id,
+        userName: userName,
+      });
 
       await handleUserLocalCamera();
     });
@@ -177,60 +220,76 @@ const Room = ({ params: { id } }: RoomParams) => {
       socket.emit("new user start", {
         to: data.socketId,
         sender: socket.id,
+        userName: data.userName,
       });
 
-      handleCreatePeerConnection(data.socketId, false);
+      handleCreatePeerConnection(data.socketId, false, data.userName);
     });
 
     socket?.on("new user start", (data) => {
-      handleCreatePeerConnection(data.sender, true);
+      handleCreatePeerConnection(data.sender, true, data.userName);
     });
 
     socket?.on("sdp", (data) => handleAnswer(data));
 
     socket?.on("ice candidates", (data) => handleIceCandidates(data));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [socket, id]);
+  }, [socket]);
 
   return (
     <div className="flex-1 flex flex-col h-full justify-between container gap-3">
-      <div className="h-full flex flex-col md:flex-row gap-3">
-        {!loading ? (
-          <>
-            <div className="w-full bg-secondary h-full grid grid-cols-1 md:grid-cols-2 gap-2 p-2">
-              {remoteStreams.map((stream, index) => {
-                return (
-                  <div key={index} className="bg-slate-900 rounded-md relative">
-                    <video
-                      className="h-full w-full aspect-video object-cover rounded-md mirror-mode"
-                      autoPlay
-                      playsInline
-                      ref={(video) => {
-                        if (video && video.srcObject !== stream.media) {
-                          video.srcObject = stream.media;
-                        }
-                      }}
-                    />
-                    <Badge
-                      className="absolute bottom-2 left-1"
-                      variant="secondary"
-                    >
-                      {stream.userName}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="bg-secondary rounded-md flex justify-end flex-col">
-              <Chat roomId={id} />
-            </div>
-          </>
-        ) : (
-          <RoomLoading />
-        )}
+      <div className="h-full flex flex-col md:flex-row gap-3 relative">
+        <div
+          className={twMerge(
+            remoteStreams.length >= 1 && "md:grid-cols-2",
+            remoteStreams.length >= 3 && "md:grid-cols-2",
+            `w-full bg-secondary h-full grid-cols-1 grid gap-2 p-2 rounded-md`
+          )}
+        >
+          <FrameVideo
+            videoChildren={
+              <video
+                className="h-full w-full aspect-video object-cover rounded-md"
+                autoPlay
+                playsInline
+                ref={currUserVideoStreaming}
+              />
+            }
+            userName={userName || ""}
+          />
+
+          {remoteStreams.map((stream, index) => {
+            return (
+              <FrameVideo
+                key={index}
+                videoChildren={
+                  <video
+                    className="h-full w-full aspect-video object-cover rounded-md"
+                    autoPlay
+                    playsInline
+                    ref={(video) => {
+                      if (video && video.srcObject !== stream.media) {
+                        video.srcObject = stream.media;
+                      }
+                    }}
+                  />
+                }
+                userName={stream.userName}
+              />
+            );
+          })}
+        </div>
+        <div className="absolute right-3 top-3">
+          <Chat roomId={id} />
+        </div>
       </div>
 
-      <SideBarSettings videoMediaStream={videoMediaStream} />
+      <SideBarSettings
+        videoMediaStream={videoMediaStream}
+        peerConnections={peerConnections}
+        currUserVideoStreaming={currUserVideoStreaming}
+        handleLogout={handleLogout}
+      />
     </div>
   );
 };

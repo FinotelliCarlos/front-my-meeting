@@ -17,7 +17,7 @@ import { FormEvent, useRef } from "react";
 const CreateRoom = () => {
   const router = useRouter();
   const userName = useRef<HTMLInputElement>(null);
-  const roomKey = useRef<HTMLInputElement>(null);
+  // const roomKey = useRef<HTMLInputElement>(null);
 
   const handleCreateRoom = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -57,7 +57,7 @@ const CreateRoom = () => {
               placeholder="John Wick"
             />
           </div>
-
+          {/* 
           <div className="space-y-1">
             <Label htmlFor="roomKey">
               Crie uma chave para entrar nessa reunião:
@@ -69,7 +69,7 @@ const CreateRoom = () => {
               autoFocus
               placeholder="xxxxxxxxxxx"
             />
-          </div>
+          </div> */}
         </CardContent>
 
         <CardFooter className="flex flex-col gap-2">
