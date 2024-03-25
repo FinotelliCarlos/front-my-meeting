@@ -97,19 +97,19 @@ const Room = ({ params: { id } }: RoomParams) => {
     }
 
     peerConnection.ontrack = (event) => {
-      const remoteStream = event.streams[0];
+      event.streams.forEach((currStreaming) => {
+        const dataStream: RemoteStreamsProps = {
+          id: socketId,
+          media: currStreaming,
+          userName,
+        };
 
-      const dataStream: RemoteStreamsProps = {
-        id: socketId,
-        media: remoteStream,
-        userName,
-      };
-
-      setRemoteStreams((prevRemote) => {
-        if (!prevRemote.some((stream) => stream.id === socketId)) {
-          return [...prevRemote, dataStream];
-        }
-        return prevRemote;
+        setRemoteStreams((prevRemote) => {
+          if (!prevRemote.some((stream) => stream.id === socketId)) {
+            return [...prevRemote, dataStream];
+          }
+          return prevRemote;
+        });
       });
     };
 
@@ -202,7 +202,7 @@ const Room = ({ params: { id } }: RoomParams) => {
       typeof window !== "undefined";
     },
     () => sessionStorage.getItem("userName"),
-    () => ""
+    () => "Nome do usuário"
   );
 
   useEffect(() => {
